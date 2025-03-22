@@ -1,49 +1,23 @@
+<<<<<<< HEAD
 pipeline {
     agent any
 
     environment {
-        // Parametrizing the environment variables
         DOCKER_TAG = "${BUILD_NUMBER}"
-        IMAGE_NAME = "manojkrishnappa/fullstack"
-        AWS_REGION = "us-east-1"
-        SONAR_URL = 'http://3.84.96.251:9000/'  // SonarQube URL
-        GIT_REPO_NAME = "complete-cicd-project-microdegree"
-        GIT_USER_NAME = "ManojKRISHNAPPA"
-    }
-
-    tools {
-        jdk 'java-17'
-        maven 'maven'
+        IMAGE_NAME = "reet02/rag-application"
+        GITLAB_REPO = "devops-application"
+        GITLAB_USER = "demo9634707"
+        GITLAB_URL = "https://gitlab.com/${GITLAB_USER}/${GITLAB_REPO}.git"
     }
 
     stages {
         stage('Git Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/ManojKRISHNAPPA/complete-cicd-project-microdegree.git'
+                git branch: 'main', url: "${GITLAB_URL}"
             }
         }
 
-        stage('Compile') {
-            steps {
-                sh "mvn compile"
-            }
-        }
-
-        stage('Build') {
-            steps {
-                sh "mvn clean install"
-            }
-        }
-
-        stage('Static Code Analysis (SonarQube)') {
-            steps {
-                withCredentials([string(credentialsId: 'sonarqube', variable: 'SONAR_AUTH_TOKEN')]) {
-                    sh "mvn sonar:sonar -Dsonar.login=$SONAR_AUTH_TOKEN -Dsonar.host.url=${SONAR_URL}"
-                }
-            }
-        }
-
-        stage('Build and Tag Docker Image') {
+        stage('Build Docker Image') {
             steps {
                 sh "docker build -t ${IMAGE_NAME}:${DOCKER_TAG} ."
             }
@@ -51,10 +25,12 @@ pipeline {
 
         stage('Login to Docker Hub') {
             steps {
-                script {
-                    withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
-                        sh "echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin"
-                    }
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker-hub-credentials',
+                    usernameVariable: 'DOCKER_USERNAME',
+                    passwordVariable: 'DOCKER_PASSWORD'
+                )]) {
+                    sh "echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin"
                 }
             }
         }
@@ -65,58 +41,98 @@ pipeline {
             }
         }
 
-        stage('Update Deployment File') {
+        stage('Update Deployment File in GitLab') {
             steps {
-                withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
-                    sh '''
-                        git config user.email "contactmanojmech@gmail.com"
-                        git config user.name "${GIT_USER_NAME}"
+                withCredentials([string(credentialsId: 'gitlab-token', variable: 'GITLAB_TOKEN')]) {
+                    sh """
+                        git config user.email "reetwizamatya02@gmail.com"
+                        git config user.name "${GITLAB_USER}"
 
-                        # Update deployment.yml with the correct Docker image version (Build Number)
-                        sed -i "s|image: manojkrishnappa/fullstack:[^ ]*|image: manojkrishnappa/fullstack:${DOCKER_TAG}|g" argocd-manifest/deployment.yml
+                        # Update deployment.yml with the new Docker image tag
+                        sed -i "s|image: ${IMAGE_NAME}:.*|image: ${IMAGE_NAME}:${DOCKER_TAG}|g" argocd-manifest/deployment.yml
 
-                        # Commit and push the updated deployment file
+                        # Commit and push changes to GitLab
                         git add argocd-manifest/deployment.yml
                         git commit -m "Update deployment image to version ${DOCKER_TAG}"
-                        git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME} HEAD:main
-                    '''
+                        git push https://oauth2:${GITLAB_TOKEN}@gitlab.com/${GITLAB_USER}/${GITLAB_REPO}.git HEAD:main
+                    """
                 }
             }
         }
     }
+=======
+pipeline {
+    agent any
 
-    post {
-        always {
-            script {
-                def jobName = env.JOB_NAME
-                def buildNumber = env.BUILD_NUMBER
-                def pipelineStatus = currentBuild.result ?: 'UNKNOWN'
-                def bannerColor = pipelineStatus.toUpperCase() == 'SUCCESS' ? 'green' : 'red'
+    environment {
+        DOCKER_TAG = "${BUILD_NUMBER}"
+        IMAGE_NAME = "reet02/rag-application"
+        GITLAB_REPO = "devops-application"
+        GITLAB_USERNAME = "Reetwiz"  // This is used for git config user.name
+        GITLAB_USER = "demo9634707"  // This is part of the repository URL
+        GITLAB_URL = "https://gitlab.com/${GITLAB_USER}/${GITLAB_REPO}.git"
+    }
 
-                def body = """
-                    <html>
-                    <body>
-                    <div style="border: 4px solid ${bannerColor}; padding: 10px;">
-                    <h2>${jobName} - Build ${buildNumber}</h2>
-                    <div style="background-color: ${bannerColor}; padding: 10px;">
-                    <h3 style="color: white;">Pipeline Status: ${pipelineStatus.toUpperCase()}</h3>
-                    </div>
-                    <p>Check the <a href="${BUILD_URL}">console output</a>.</p>
-                    </div>
-                    </body>
-                    </html>
-                """
+    stages {
+        stage('Git Checkout') {
+            steps {
+                git branch: 'main', url: "${GITLAB_URL}"
+            }
+        }
 
-                emailext (
-                    subject: "${jobName} - Build ${buildNumber} - ${pipelineStatus.toUpperCase()}",
-                    body: body,
-                    to: 'manojdevopstest@gmail.com',
-                    from: 'contactmanojmech@gmail.com',
-                    replyTo: 'contactmanojmech@gmail.com',
-                    mimeType: 'text/html',
-                    attachmentsPattern: '**/target/sonar-report.html'  // Path to the SonarQube report file
-                )
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build -t ${IMAGE_NAME}:${DOCKER_TAG} ."
+            }
+        }
+
+        stage('Login to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker-hub-credentials',
+                    usernameVariable: 'DOCKER_USERNAME',
+                    passwordVariable: 'DOCKER_PASSWORD'
+                )]) {
+                    sh "echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin"
+                }
+            }
+        }
+
+        stage('Push Image to Docker Hub') {
+            steps {
+                sh "docker push ${IMAGE_NAME}:${DOCKER_TAG}"
+            }
+        }
+
+        stage('Update Deployment File in GitLab') {
+            steps {
+                withCredentials([string(credentialsId: 'gitlab-token', variable: 'GITLAB_TOKEN')]) {
+                    sh """
+                        # Configure git with correct values
+                        git config --global user.email "ekantakuna001@gmail.com"
+                        git config --global user.name "${GITLAB_USERNAME}"
+
+                        # Update deployment.yml with the new Docker image tag
+                        sed -i "s|image: ${IMAGE_NAME}:.*|image: ${IMAGE_NAME}:${DOCKER_TAG}|g" argocd-manifest/deployment.yml
+
+                        # Check if there are changes to commit
+                        if git diff --quiet; then
+                            echo "No changes to commit"
+                        else
+                            # Commit and push changes to GitLab
+                            git add argocd-manifest/deployment.yml
+                            git commit -m "Update deployment image to version ${DOCKER_TAG}"
+                            
+                            # Debug output before pushing
+                            echo "Pushing to: https://oauth2:****@gitlab.com/${GITLAB_USER}/${GITLAB_REPO}.git"
+                            
+                            # Use --force to ensure the push succeeds
+                            git push https://oauth2:${GITLAB_TOKEN}@gitlab.com/${GITLAB_USER}/${GITLAB_REPO}.git HEAD:main
+                        fi
+                    """
+                }
             }
         }
     }
+>>>>>>> 448ab5e402f48d04829e035274eaea1028c66ad6
 }
